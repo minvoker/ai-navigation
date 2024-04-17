@@ -139,11 +139,15 @@ def depth_first_search(problem):
 
 # Explored BFS --------- WORKING
 def breadth_first_search(problem):
-    """Breadth-First Search (BFS) with explored."""
+    """Uses a queue (deque) to explore the search tree level by level, tracking explored states (set) to avoid revisiting them. Search terminates when goal state is found or entire search space has been explored.
+    
+    Takes an instance of Problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
+    """
     node = Node(problem.initial)
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
         return node, num_of_nodes
+    
     frontier = deque([node])  # FIFO queue
     explored = set()
 
@@ -152,8 +156,8 @@ def breadth_first_search(problem):
         num_of_nodes += 1  # Increment counter for each child node
         explored.add(node.state)  
         if problem.goal_test(node.state):
-            print("explored", explored)
             return node, num_of_nodes
+        
         for child in node.expand(problem):
             if child.state not in explored and child not in frontier: 
                 frontier.append(child)
@@ -194,11 +198,14 @@ def depth_limited_search(problem, limit=13):
             return None, num_nodes
 
     return None, num_nodes
+
 # ______________________________________________________________________________
 # Informed Search algorithms
  # GBFS --------- WORKING
 def greedy_best_first_search(problem):
-    """Greedy Best-First Search (GBFS) with explored."""
+    """Perform a greedy best-first search on a problem with explored set. This implementation uses a list as the frontier, which is sorted by the heuristic value of each node. The node with the lowest heuristic value (Manhattan Distance) popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
+    
+    Takes an instance of Problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found."""
     node = Node(problem.initial)
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
@@ -223,7 +230,7 @@ def greedy_best_first_search(problem):
 
 # AS --------- WORKING
 def a_star_search(problem):
-    """A* Search with explored."""
+    """Perform A* search on given problem with an explored set. This implementation uses a"""
     node = Node(problem.initial)
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
@@ -240,7 +247,6 @@ def a_star_search(problem):
             num_of_nodes += 1
             explored.add(node.state)
             if problem.goal_test(node.state):
-                print("Explored", explored)
                 return node, num_of_nodes
 
             new_frontier = deque()
@@ -256,7 +262,7 @@ def a_star_search(problem):
 
             # Append new_frontier to the existing frontier, preserving chronological order
             frontier = new_frontier + frontier
-    print("Explored", explored)
+            
     return None, num_of_nodes
    
 # ______________________________________________________________________________
@@ -314,33 +320,40 @@ class RobotNavigation(Problem):
 
 def runRobotNavigation(filename, method):
     with open(filename, 'r') as f:
-        data = f.readlines()
+        data = [line.strip() for line in f.readlines()]
         f.close()
     
-    rows, cols = eval(data[0].strip())
-    initial = eval(data[1].strip())
-    goal = [eval(coord.strip()) for coord in data[2].strip().split('|')]
-    # Unreachable GOAL:
-    #goal = [20,9]
+    rows, cols = eval(data[0])
+    initial = eval(data[1])
+    goal_coords = data[2].split('|')
+    if len(goal_coords) == 1:
+        goal = [eval(goal_coords[0])]
+    else:
+        goal = [eval(coord.strip()) for coord in goal_coords]
+
     # Create an empty grid filled with '.' (empty cells)
     grid = [['.' for _ in range(cols)] for _ in range(rows)]
     
     # Add Walls as '#'
     for i in data[3:]:
-        x, y, width, height = map(int, i.strip()[1:-1].split(','))
-        for r in range(y, y + height):
-            for c in range(x, x + width):
-                grid[r][c] = '#'
-    
-    print("Grid")          
-    for i in grid:
-        print(i, "\n")
+        if i: # Check line is not empty
+            x, y, width, height = map(int, i.strip()[1:-1].split(','))
+            for r in range(y, y + height):
+                for c in range(x, x + width):
+                    grid[r][c] = '#'
     
     prob = RobotNavigation(initial, goal, grid)
     result = None
     number_of_nodes = 0
+    ''' # DEBUG: Display Grid
+    print("Grid")          
+    for i in grid:
+        print(i, "\n")
+    for goal in prob.goal:
+        print("Goal", goal)
+    '''
     
-    ''' Search Methods '''
+     # Search Algorithms____________________________________________
     if method.upper() == 'BFS':
         result, number_of_nodes = breadth_first_search(prob)
         
@@ -358,7 +371,8 @@ def runRobotNavigation(filename, method):
     
     elif method.upper() == 'CUS2':
         result, number_of_nodes = iterative_deepening_search(prob)
-    # ____________________________________________
+    # ______________________________________________________________
+    
     if result is None:
         print(f"{filename} {method}")
         print(f"No goal is reachable; {number_of_nodes} ")
@@ -375,9 +389,13 @@ def runRobotNavigation(filename, method):
         print(f"{filename} {method}\n{result} {number_of_nodes}\n{path}")
             
     
-    
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python search.py <filename> <method>")
+        sys.exit(1)
 
+    filename = sys.argv[1]
+    method = sys.argv[2]
+    runRobotNavigation(filename, method)
 
-filename = './test_cases/test1.txt'# 'RobotNav-test.txt'
-runRobotNavigation(filename, 'AS')
 
