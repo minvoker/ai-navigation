@@ -2,33 +2,9 @@
 COS30019 Assignment 1 - Robot Navigation Search
 Author: Max Harrison 104586300
 
-STEPS REQUIRED
-1. Problem Setup
-- Robot Navigation Search Problem
-    NxM grid where N>1 and M>1
-    
-2. Search Strategies
-Uninformed Search:
-- Depth First Search (DFS)
-- Breadth First Search (BFS)
 
-Informed Search:
-- Greedy Best First Search (GBFS)
-- A* Search (AS)
-
-Custom:
-- ### UNINFORMED CUSTOM SEARCH (CUS1)
-- ### INFORMED CUSTOM SEARCH (CUS2)
-
-3. Command Line Operation
-- python search.py <filename> <method>
-- When a goal can be reached, standard output needs to be in the following format:
-    filename method
-    goal number_of_nodes
-    path
-- When a goal cannot be reached, standard output needs to be in the following format:
-    filename method
-    No goal is reachable; number_of_nodes
+Testing: At least 10 test cases have been created to cover different problem 
+scenarios. Test results have been checked and documented. 
 
 4. Report File
 
@@ -40,7 +16,7 @@ HOW TO USE CODE INSTRUCTIONS:
 import sys
 import json
 from collections import deque 
-
+from queue import PriorityQueue
 from utils import *
 
 
@@ -89,15 +65,6 @@ class Problem:
         raise NotImplementedError
 
 class Node:
-    """A node in a search tree. Contains a pointer to the parent (the node
-    that this is a successor of) and to the actual state for this node. Note
-    that if a state is arrived at by two paths, then there are two nodes with
-    the same state. Also includes the action that got us to this state, and
-    the total path_cost (also known as g) to reach the node. Other functions
-    may add an f and h value; see best_first_graph_search and astar_search for
-    an explanation of how the f and h values are handled. You will not need to
-    subclass this class."""
-
     def __init__(self, state, parent=None, action=None, path_cost=0):
         """Create a search tree Node, derived from a parent by an action."""
         self.state = state
@@ -177,64 +144,121 @@ def breadth_first_search(problem):
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
         return node, num_of_nodes
-    
-    frontier_queue = deque([node])  # FIFO queue
-    frontier_set = {(node.state[1], node.state[0])}  # For efficient membership checks, use swapped coordinates
+    frontier = deque([node])  # FIFO queue
     explored = set()
 
-    while frontier_queue:
-        node = frontier_queue.popleft()
-        frontier_set.remove((node.state[1], node.state[0]))  
-        explored.add((node.state[1], node.state[0]))  
-        # DEBUG: print("Frontier: ", frontier_queue)
+    while frontier:
+        node = frontier.popleft()
+        num_of_nodes += 1  # Increment counter for each child node
+        explored.add(node.state)  
+        if problem.goal_test(node.state):
+            print("explored", explored)
+            return node, num_of_nodes
         for child in node.expand(problem):
-            num_of_nodes += 1  # Increment counter for each child node
-            if (child.state[1], child.state[0]) not in explored and (child.state[1], child.state[0]) not in frontier_set: 
-                if problem.goal_test(child.state):
-                    return child, num_of_nodes
-                frontier_queue.append(child)
-                frontier_set.add((child.state[1], child.state[0]))  
+            if child.state not in explored and child not in frontier: 
+                frontier.append(child)
+    
+    return None, num_of_nodes
+
+# Iterative Deepening CUS1 --------- WORKING
+def iterative_deepening_search(problem):
+    """Iterative Deepening Search (IDS)."""
+    depth = 0
+    while True:
+        result, num_nodes = depth_limited_search(problem, depth)
+        if result is not None:
+            return result, num_nodes
+        depth += 1
+        
+    return None, num_nodes
+
+def depth_limited_search(problem, limit=13):
+    """Depth-Limited Search (DLS) with explored set. limit must be <=13 to work in current grid."""
+    frontier = [(Node(problem.initial))]  # Stack
+    explored = set()
+    num_nodes = 0
+
+    while frontier:
+        node = frontier.pop()
+        num_nodes += 1
+
+        if problem.goal_test(node.state):
+            return node, num_nodes
+
+        explored.add(node.state)
+
+        if node.depth < limit:
+            frontier.extend(child for child in node.expand(problem)
+                            if child.state not in explored and child not in frontier)
+        elif node.depth == limit:  # cutoff condition
+            return None, num_nodes
+
+    return None, num_nodes
+# ______________________________________________________________________________
+# Informed Search algorithms
+ # GBFS --------- WORKING
+def greedy_best_first_search(problem):
+    """Greedy Best-First Search (GBFS) with explored."""
+    node = Node(problem.initial)
+    num_of_nodes = 1  # Count the initial node
+    if problem.goal_test(node.state):
+        return node, num_of_nodes
+
+    frontier = [(node, problem.manhattan_distance(node.state))]  # Queue with heuristic values
+    explored = set()
+
+    while frontier:
+        node, _ = frontier.pop(0)  # Remove the node with the lowest heuristic value
+        num_of_nodes += 1
+        explored.add(node.state)
+        if problem.goal_test(node.state):
+            return node, num_of_nodes
+
+        for child in node.expand(problem):
+            if child.state not in explored:
+                frontier.append((child, problem.manhattan_distance(child.state)))  # Sort by heuristic value
+                frontier.sort(key=lambda item: item[1]) 
 
     return None, num_of_nodes
 
-# ______________________________________________________________________________
-# Informed Search algorithms
+# AS --------- WORKING
+def a_star_search(problem):
+    """A* Search with explored."""
+    node = Node(problem.initial)
+    num_of_nodes = 1  # Count the initial node
+    if problem.goal_test(node.state):
+        return node, num_of_nodes
 
-def depth_limited_search(problem, limit=50):
-    """[Figure 3.17]"""
+    frontier = deque([(node.path_cost, 0, node)])  # (g(n), h(n), node)
+    explored = set()
 
-    def recursive_dls(node, problem, limit):
-        if problem.goal_test(node.state):
-            return node
-        elif limit == 0:
-            return 'cutoff'
-        else:
-            cutoff_occurred = False
+    while frontier:
+        g_n, h_n, node = frontier.popleft()  # Remove the node with the lowest f(n)
+        f_n = g_n + h_n  # f(n) = g(n) + h(n)
+
+        if node.state not in explored:
+            num_of_nodes += 1
+            explored.add(node.state)
+            if problem.goal_test(node.state):
+                print("Explored", explored)
+                return node, num_of_nodes
+
+            new_frontier = deque()
             for child in node.expand(problem):
-                result = recursive_dls(child, problem, limit - 1)
-                if result == 'cutoff':
-                    cutoff_occurred = True
-                elif result is not None:
-                    return result
-            return 'cutoff' if cutoff_occurred else None
+                child_g_n = child.path_cost
+                child_h_n = problem.manhattan_distance(child.state)
 
-    # Body of depth_limited_search:
-    return recursive_dls(Node(problem.initial), problem, limit)
+                if child.state not in explored:
+                    new_frontier.append((child_g_n, child_h_n, child))
 
+            # Sort new_frontier based on f(n) = g(n) + h(n), and g(n)
+            new_frontier = deque(sorted(new_frontier, key=lambda item: (item[0] + item[1], item[0])))
 
-def iterative_deepening_search(problem):
-    """[Figure 3.18]"""
-    for depth in range(sys.maxsize):
-        result = depth_limited_search(problem, depth)
-        if result != 'cutoff':
-            return result
-
-
-def uniform_cost_search(problem, display=False):
-    """[Figure 3.14]"""
-    #return best_first_search(problem, lambda node: node.path_cost, display)
-    return 1
-
+            # Append new_frontier to the existing frontier, preserving chronological order
+            frontier = new_frontier + frontier
+    print("Explored", explored)
+    return None, num_of_nodes
+   
 # ______________________________________________________________________________
 # Robot Problem
 
@@ -274,17 +298,30 @@ class RobotNavigation(Problem):
         #DEBUG
         #print(f"Applying action {action} to state {state} results in state {(new_col, new_row)}")
         return (new_col, new_row)  
+    
+    def manhattan_distance(self, state):
+        """Calculate the minimum Manhattan distance from a state to the nearest goal."""
+        x1, y1 = state
+        min_distance = float('inf')
+
+        for goal_state in self.goal:
+            x2, y2 = goal_state
+            distance = abs(x1 - x2) + abs(y1 - y2)
+            min_distance = min(min_distance, distance)
+
+        return min_distance
 
 
 def runRobotNavigation(filename, method):
     with open(filename, 'r') as f:
         data = f.readlines()
+        f.close()
     
     rows, cols = eval(data[0].strip())
     initial = eval(data[1].strip())
     goal = [eval(coord.strip()) for coord in data[2].strip().split('|')]
     # Unreachable GOAL:
-    # goal = [20,9]
+    #goal = [20,9]
     # Create an empty grid filled with '.' (empty cells)
     grid = [['.' for _ in range(cols)] for _ in range(rows)]
     
@@ -294,16 +331,14 @@ def runRobotNavigation(filename, method):
         for r in range(y, y + height):
             for c in range(x, x + width):
                 grid[r][c] = '#'
-    '''
+    
     print("Grid")          
     for i in grid:
         print(i, "\n")
-    print("Goal State:", goal)
-    '''
+    
     prob = RobotNavigation(initial, goal, grid)
     result = None
     number_of_nodes = 0
-    
     
     ''' Search Methods '''
     if method.upper() == 'BFS':
@@ -311,9 +346,19 @@ def runRobotNavigation(filename, method):
         
     elif method.upper() == 'DFS':
         result, number_of_nodes = depth_first_search(prob)
+        
+    elif method.upper() == 'GBFS':
+        result, number_of_nodes = greedy_best_first_search(prob)
+        
+    elif method.upper() == 'AS':
+        result, number_of_nodes = a_star_search(prob)
     
+    elif method.upper() == 'CUS1':
+        result, number_of_nodes = iterative_deepening_search(prob)
+    
+    elif method.upper() == 'CUS2':
+        result, number_of_nodes = iterative_deepening_search(prob)
     # ____________________________________________
-    
     if result is None:
         print(f"{filename} {method}")
         print(f"No goal is reachable; {number_of_nodes} ")
@@ -333,7 +378,6 @@ def runRobotNavigation(filename, method):
     
 
 
-filename = 'RobotNav-test.txt'
-runRobotNavigation(filename, 'DFS')
-
+filename = './test_cases/test1.txt'# 'RobotNav-test.txt'
+runRobotNavigation(filename, 'AS')
 
