@@ -2,13 +2,6 @@
 COS30019 Assignment 1 - Robot Navigation Search
 Author: Max Harrison 104586300
 
-
-Testing: At least 10 test cases have been created to cover different problem 
-scenarios. Test results have been checked and documented. 
-
-4. Report File
-
-
 HOW TO USE CODE INSTRUCTIONS:
 
 """
@@ -119,11 +112,15 @@ class Node:
         # with the same state in a Hash Table
         return hash(self.state)
 
-
 # ______________________________________________________________________________
 # Uninformed Search algorithms
 # Explored DFS --------- WORKING
 def depth_first_search(problem):
+    '''
+    Depth-First Search (DFS) with explored set. This implementation uses a stack to explore the search tree depth-first, tracking explored states (set) to avoid revisiting them. Search terminates when goal state is found or entire search space has been explored.
+    
+    Takes an instance of Problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
+    '''
     frontier = [(Node(problem.initial))]  # Stack
     num_of_nodes = 1  # Count the initial node
     explored = set()
@@ -139,10 +136,11 @@ def depth_first_search(problem):
 
 # Explored BFS --------- WORKING
 def breadth_first_search(problem):
-    """Uses a queue (deque) to explore the search tree level by level, tracking explored states (set) to avoid revisiting them. Search terminates when goal state is found or entire search space has been explored.
+    '''
+    Uses a queue (deque) to explore the search tree level by level, tracking explored states (set) to avoid revisiting them. Search terminates when goal state is found or entire search space has been explored.
     
     Takes an instance of Problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
-    """
+    '''
     node = Node(problem.initial)
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
@@ -165,37 +163,33 @@ def breadth_first_search(problem):
     return None, num_of_nodes
 
 # Iterative Deepening CUS1 --------- WORKING
-def iterative_deepening_search(problem):
-    """Iterative Deepening Search (IDS)."""
+def iterative_deepening_bfs(problem):
+    """Iterative Deepening Breadth-First Search"""
     depth = 0
     while True:
-        result, num_nodes = depth_limited_search(problem, depth)
+        result, num_nodes = depth_limited_bfs(problem, depth)
         if result is not None:
             return result, num_nodes
         depth += 1
-        
-    return None, num_nodes
 
-def depth_limited_search(problem, limit=13):
-    """Depth-Limited Search (DLS) with explored set. limit must be <=13 to work in current grid."""
-    frontier = [(Node(problem.initial))]  # Stack
+def depth_limited_bfs(problem, limit):
+    """Breadth-First Search with Depth Limit"""
+    frontier = deque([(Node(problem.initial), 0)])  # (node, depth)
     explored = set()
     num_nodes = 0
 
     while frontier:
-        node = frontier.pop()
+        node, depth = frontier.popleft()
         num_nodes += 1
-
+        
         if problem.goal_test(node.state):
             return node, num_nodes
-
         explored.add(node.state)
 
-        if node.depth < limit:
-            frontier.extend(child for child in node.expand(problem)
-                            if child.state not in explored and child not in frontier)
-        elif node.depth == limit:  # cutoff condition
-            return None, num_nodes
+        if depth < limit:
+            for child in node.expand(problem):
+                if child.state not in explored and child.state not in [n.state for n, d in frontier]:
+                    frontier.append((child, depth + 1))
 
     return None, num_nodes
 
@@ -203,45 +197,22 @@ def depth_limited_search(problem, limit=13):
 # Informed Search algorithms
  # GBFS --------- WORKING
 def greedy_best_first_search(problem):
-    """Perform a greedy best-first search on a problem with explored set. This implementation uses a list as the frontier, which is sorted by the heuristic value of each node. The node with the lowest heuristic value (Manhattan Distance) popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
+    '''
+    Perform a greedy best-first search on a problem with explored set. This implementation uses a list as the frontier, which is sorted by the heuristic value of each node. The node with the lowest heuristic value (Manhattan Distance) popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
     
-    Takes an instance of Problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found."""
+    Takes an instance of Problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
+    '''
     node = Node(problem.initial)
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
         return node, num_of_nodes
 
-    frontier = [(node, problem.manhattan_distance(node.state))]  # Queue with heuristic values
+    frontier = PriorityQueue(order='min', f=lambda x: x[0])
+    frontier.append((problem.manhattan_distance(node.state), node))
     explored = set()
 
-    while frontier:
-        node, _ = frontier.pop(0)  # Remove the node with the lowest heuristic value
-        num_of_nodes += 1
-        explored.add(node.state)
-        if problem.goal_test(node.state):
-            return node, num_of_nodes
-
-        for child in node.expand(problem):
-            if child.state not in explored:
-                frontier.append((child, problem.manhattan_distance(child.state)))  # Sort by heuristic value
-                frontier.sort(key=lambda item: item[1]) 
-
-    return None, num_of_nodes
-
-# AS --------- WORKING
-def a_star_search(problem):
-    """Perform A* search on given problem with an explored set. This implementation uses a"""
-    node = Node(problem.initial)
-    num_of_nodes = 1  # Count the initial node
-    if problem.goal_test(node.state):
-        return node, num_of_nodes
-
-    frontier = deque([(node.path_cost, 0, node)])  # (g(n), h(n), node)
-    explored = set()
-
-    while frontier:
-        g_n, h_n, node = frontier.popleft()  # Remove the node with the lowest f(n)
-        f_n = g_n + h_n  # f(n) = g(n) + h(n)
+    while frontier.heap:
+        h_n, node = frontier.pop()
 
         if node.state not in explored:
             num_of_nodes += 1
@@ -249,22 +220,47 @@ def a_star_search(problem):
             if problem.goal_test(node.state):
                 return node, num_of_nodes
 
-            new_frontier = deque()
             for child in node.expand(problem):
-                child_g_n = child.path_cost
                 child_h_n = problem.manhattan_distance(child.state)
-
                 if child.state not in explored:
-                    new_frontier.append((child_g_n, child_h_n, child))
+                    frontier.append((child_h_n, child))
 
-            # Sort new_frontier based on f(n) = g(n) + h(n), and g(n)
-            new_frontier = deque(sorted(new_frontier, key=lambda item: (item[0] + item[1], item[0])))
+    return None, num_of_nodes
 
-            # Append new_frontier to the existing frontier, preserving chronological order
-            frontier = new_frontier + frontier
-            
+# AS --------- WORKING
+def a_star_search(problem):
+    '''
+    Perform A* search on given problem with an explored set. This implementation uses a PriorityQueue as the frontier, which stores tuples of (f(n), node) where f(n) = g(n) + h(n). g(n) is the path cost and h(n) is the heuristic estimate (Manhattan Distance) of the cost from n to the goal state. At each iteration the node with lowest f(n) is popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
+    
+    Requires an instance of the problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
+    '''
+    node = Node(problem.initial)
+    num_of_nodes = 1  # Count the initial node
+    if problem.goal_test(node.state):
+        return node, num_of_nodes
+
+    frontier = PriorityQueue(order='min', f=lambda x: x[0])
+    frontier.append((node.path_cost + problem.manhattan_distance(node.state), node))
+    explored = set()
+
+    while frontier.heap:
+        f_n, node = frontier.pop()
+
+        if node.state not in explored:
+            num_of_nodes += 1
+            explored.add(node.state)
+            if problem.goal_test(node.state):
+                return node, num_of_nodes
+
+            for child in node.expand(problem):
+                child_f_n = child.path_cost + problem.manhattan_distance(child.state)
+                if child.state not in explored:
+                    frontier.append((child_f_n, child))
+
     return None, num_of_nodes
    
+# CUS2 --------- NOT WORKING
+
 # ______________________________________________________________________________
 # Robot Problem
 
@@ -285,7 +281,7 @@ class RobotNavigation(Problem):
     def actions(self, state):
         col, row = state 
         actions = []
-        # PRIORITY:  UP, LEFT, DOWN, RIGHT 
+        # PRIORITY:  UP, LEFT, DOWN, RIGHT    # Flip for DFS cos Stack.
         directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]  
         for dir_col, dir_row in directions:  
             new_col = col + dir_col
@@ -367,10 +363,10 @@ def runRobotNavigation(filename, method):
         result, number_of_nodes = a_star_search(prob)
     
     elif method.upper() == 'CUS1':
-        result, number_of_nodes = iterative_deepening_search(prob)
+        result, number_of_nodes = iterative_deepening_bfs(prob)
     
     elif method.upper() == 'CUS2':
-        result, number_of_nodes = iterative_deepening_search(prob)
+        result, number_of_nodes = iterative_deepening_bfs(prob)
     # ______________________________________________________________
     
     if result is None:
