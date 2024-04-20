@@ -3,15 +3,15 @@ COS30019 Assignment 1 - Robot Navigation Search
 Author: Max Harrison 104586300
 
 HOW TO USE CODE INSTRUCTIONS:
-
+GUI is optional. To run the program in GUI mode, you must have Pygame installed. If you do not have Pygame installed, the program will run in console mode.
+- Methods: BFS, DFS, GBFS, AS, CUS1, CUS2
+- 'python search.py <filename> <method> [GUI]'
 """
 
 import sys
-import json
 from collections import deque 
 from queue import PriorityQueue
 from utils import *
-
 
 class Problem:
     def __init__(self, initial, goal=None):
@@ -174,7 +174,7 @@ def iterative_deepening_bfs(problem):
 
 def depth_limited_bfs(problem, limit):
     """Breadth-First Search with Depth Limit"""
-    frontier = deque([(Node(problem.initial), 0)])  # (node, depth)
+    frontier = deque([(Node(problem.initial), 0)])  # node, depth
     explored = set()
     num_nodes = 0
 
@@ -260,10 +260,42 @@ def a_star_search(problem):
     return None, num_of_nodes
    
 # CUS2 --------- NOT WORKING
+def iterative_deepening_astar(problem):
+    """Iterative Deepening A* (IDA*) with explored set"""
+    def recursive_dfs(node, problem, g, f_limit, num_nodes, explored):
+        num_nodes += 1
+        explored.add(node.state)
 
+        if problem.goal_test(node.state):
+            return node, g, num_nodes
+
+        min_f = float('inf')
+        for child in node.expand(problem):
+            if child.state not in explored:
+                f = g + 1 + problem.manhattan_distance(child.state)
+                if f <= f_limit:
+                    result, f_child, num_nodes = recursive_dfs(child, problem, g + 1, f_limit, num_nodes, explored)
+                    if result is not None:
+                        return result, f_child, num_nodes
+                    min_f = min(min_f, f_child)
+
+        return None, min_f, num_nodes
+
+    f_limit = problem.manhattan_distance(problem.initial)
+    num_nodes = 0
+    explored = set()
+
+    while True:
+        result, min_f, num_nodes = recursive_dfs(Node(problem.initial), problem, 0, f_limit, num_nodes, explored)
+        if result is not None:
+            return result, num_nodes
+        if min_f == float('inf'):
+            return None, num_nodes
+        f_limit = min_f + 1
+
+    return None, num_nodes
 # ______________________________________________________________________________
 # Robot Problem
-
 class RobotNavigation(Problem):
     def __init__(self, initial, goal, grid):
         super().__init__(initial, goal)
@@ -281,7 +313,7 @@ class RobotNavigation(Problem):
     def actions(self, state):
         col, row = state 
         actions = []
-        # PRIORITY:  UP, LEFT, DOWN, RIGHT    # Flip for DFS cos Stack.
+        # PRIORITY:  UP, LEFT, DOWN, RIGHT 
         directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]  
         for dir_col, dir_row in directions:  
             new_col = col + dir_col
@@ -314,7 +346,7 @@ class RobotNavigation(Problem):
         return min_distance
 
 
-def runRobotNavigation(filename, method):
+def run_robot_navigation(filename, method, gui=False):
     with open(filename, 'r') as f:
         data = [line.strip() for line in f.readlines()]
         f.close()
@@ -327,10 +359,10 @@ def runRobotNavigation(filename, method):
     else:
         goal = [eval(coord.strip()) for coord in goal_coords]
 
-    # Create an empty grid filled with '.' (empty cells)
+    # Create an empty grid filled with empty cells '.'
     grid = [['.' for _ in range(cols)] for _ in range(rows)]
     
-    # Add Walls as '#'
+    # Add Walls '#'
     for i in data[3:]:
         if i: # Check line is not empty
             x, y, width, height = map(int, i.strip()[1:-1].split(','))
@@ -341,6 +373,7 @@ def runRobotNavigation(filename, method):
     prob = RobotNavigation(initial, goal, grid)
     result = None
     number_of_nodes = 0
+    
     ''' # DEBUG: Display Grid
     print("Grid")          
     for i in grid:
@@ -349,7 +382,7 @@ def runRobotNavigation(filename, method):
         print("Goal", goal)
     '''
     
-     # Search Algorithms____________________________________________
+    # Search Algorithms____________________________________________
     if method.upper() == 'BFS':
         result, number_of_nodes = breadth_first_search(prob)
         
@@ -366,7 +399,7 @@ def runRobotNavigation(filename, method):
         result, number_of_nodes = iterative_deepening_bfs(prob)
     
     elif method.upper() == 'CUS2':
-        result, number_of_nodes = iterative_deepening_bfs(prob)
+        result, number_of_nodes = iterative_deepening_astar(prob)
     # ______________________________________________________________
     
     if result is None:
@@ -378,20 +411,103 @@ def runRobotNavigation(filename, method):
         while pNode.parent:
             path.insert(0, pNode.action)
             pNode = pNode.parent
-            
+        # Print directions rather than numbers
         directions = {(0, -1): 'up', (-1, 0): 'left', (0, 1): 'down', (1, 0): 'right'}
 
         path = [directions[action] for action in path]
         print(f"{filename} {method}\n{result} {number_of_nodes}\n{path}")
+        
+        # GUI Implementation
+        if gui:
+            robot_gui(grid, rows, cols, initial, goal, result, path)
             
+            
+def robot_gui(grid, rows, cols, initial, goal, result, path):
+    # Check for pygame install and import it
+    try:
+        import pygame
+    except ImportError:
+        print("Pygame is not installed. Please install Pygame to run the program in GUI mode.")
+        return
+
+    # Initialize pygame and colours
+    pygame.init()
+    WHITE = (255, 255, 255)
+    BLACK = (0, 0, 0)
+    GREY = (100, 100, 100)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    PATH = (0, 0, 150)
+    
+    # Get screen size to ensure window fits
+    this_screen = pygame.display.Info()
+    screen_width, screen_height = this_screen.current_w, this_screen.current_h
+    
+    max_cell_size = min(screen_width // cols, screen_height // rows)
+    cell_size = min(50, max_cell_size)  # Limit the cell size
+
+    # Setup window
+    grid_width = cols * cell_size
+    grid_height = rows * cell_size
+    screen = pygame.display.set_mode((grid_width, grid_height))
+    pygame.display.set_caption("Robot Navigation")
+
+    # Main loop
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                
+        # Draw the walls
+        screen.fill(WHITE)
+        for i in range(rows):
+            for j in range(cols):
+                if grid[i][j] == '#':
+                    rect = pygame.Rect(j * cell_size, i * cell_size, cell_size, cell_size)
+                    pygame.draw.rect(screen, GREY, rect)
+                    #pygame.draw.rect(screen, BLACK, rect, 1)
+                    
+        # Draw the grid
+        for i in range(rows):
+            for j in range(cols):
+                rect = pygame.Rect(j * cell_size, i * cell_size, cell_size, cell_size)
+                pygame.draw.rect(screen, BLACK, rect, 1)
+
+        # Draw start position
+        rect = pygame.Rect(initial[0] * cell_size, initial[1] * cell_size, cell_size, cell_size)
+        pygame.draw.rect(screen, RED, rect)
+
+        # Draw goal position/s
+        for g in goal:
+            rect = pygame.Rect(g[0] * cell_size, g[1] * cell_size, cell_size, cell_size)
+            pygame.draw.rect(screen, GREEN, rect)
+
+        # Draw path found
+        for i in range(len(path) + 1):
+            current_pos = result.path()[i].state
+            rect = pygame.Rect(current_pos[0] * cell_size + cell_size // 4, current_pos[1] * cell_size + cell_size // 4, cell_size // 2, cell_size // 2)
+            pygame.draw.rect(screen, PATH, rect)
+            pygame.draw.rect(screen, BLACK, rect, 1)
+
+
+        # Refresh display
+        pygame.display.flip()
+
+    # Quit Pygame
+    pygame.quit()      
     
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python search.py <filename> <method>")
-        sys.exit(1)
+    if len(sys.argv) == 3: # Run the program normally
+        filename = sys.argv[1]
+        method = sys.argv[2]
+        run_robot_navigation(filename, method)
 
-    filename = sys.argv[1]
-    method = sys.argv[2]
-    runRobotNavigation(filename, method)
+    elif len(sys.argv) == 4 and sys.argv[3].upper() == "GUI": # Run the program using the GUI 
+        filename = sys.argv[1]
+        method = sys.argv[2]
+        run_robot_navigation(filename, method, gui=True)
+    else:
+        print("Usage: python program.py <filename> <method> [GUI]")
 
 
