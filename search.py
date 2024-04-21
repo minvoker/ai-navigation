@@ -114,7 +114,6 @@ class Node:
 
 # ______________________________________________________________________________
 # Uninformed Search algorithms
-# Explored DFS --------- WORKING
 def depth_first_search(problem):
     '''
     Depth-First Search (DFS) with explored set. This implementation uses a stack to explore the search tree depth-first, tracking explored states (set) to avoid revisiting them. Search terminates when goal state is found or entire search space has been explored.
@@ -134,7 +133,6 @@ def depth_first_search(problem):
                         if child.state not in explored and child not in frontier)
     return None, num_of_nodes
 
-# Explored BFS --------- WORKING
 def breadth_first_search(problem):
     '''
     Uses a queue (deque) to explore the search tree level by level, tracking explored states (set) to avoid revisiting them. Search terminates when goal state is found or entire search space has been explored.
@@ -195,7 +193,6 @@ def depth_limited_bfs(problem, limit):
 
 # ______________________________________________________________________________
 # Informed Search algorithms
- # GBFS --------- WORKING
 def greedy_best_first_search(problem):
     '''
     Perform a greedy best-first search on a problem with explored set. This implementation uses a list as the frontier, which is sorted by the heuristic value of each node. The node with the lowest heuristic value (Manhattan Distance) popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
@@ -227,7 +224,6 @@ def greedy_best_first_search(problem):
 
     return None, num_of_nodes
 
-# AS --------- WORKING
 def a_star_search(problem):
     '''
     Perform A* search on given problem with an explored set. This implementation uses a PriorityQueue as the frontier, which stores tuples of (f(n), node) where f(n) = g(n) + h(n). g(n) is the path cost and h(n) is the heuristic estimate (Manhattan Distance) of the cost from n to the goal state. At each iteration the node with lowest f(n) is popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
@@ -259,33 +255,34 @@ def a_star_search(problem):
 
     return None, num_of_nodes
    
-# CUS2 --------- NOT WORKING
+# CUS2 --------- COMPLETE BUT NOT FINDING OPTIMAL PATHS
 def iterative_deepening_astar(problem):
     """Iterative Deepening A* (IDA*) with explored set"""
-    def recursive_dfs(node, problem, g, f_limit, num_nodes, explored):
-        num_nodes += 1
+    def recursive_dfs(node, problem, g, f_limit, num_of_nodes, explored):
+        num_of_nodes += 1
         explored.add(node.state)
 
         if problem.goal_test(node.state):
-            return node, g, num_nodes
+            return node, g, num_of_nodes
 
         min_f = float('inf')
         for child in node.expand(problem):
             if child.state not in explored:
                 f = g + 1 + problem.manhattan_distance(child.state)
                 if f <= f_limit:
-                    result, f_child, num_nodes = recursive_dfs(child, problem, g + 1, f_limit, num_nodes, explored)
+                    result, f_child, num_of_nodes = recursive_dfs(child, problem, g + 1, f_limit, num_of_nodes, explored)
                     if result is not None:
-                        return result, f_child, num_nodes
+                        return result, f_child, num_of_nodes
                     min_f = min(min_f, f_child)
 
-        return None, min_f, num_nodes
+        return None, min_f, num_of_nodes
 
+    # Main Function
     f_limit = problem.manhattan_distance(problem.initial)
     num_nodes = 0
-    explored = set()
 
-    while True:
+    while True: 
+        explored = set() #Reset each iteration
         result, min_f, num_nodes = recursive_dfs(Node(problem.initial), problem, 0, f_limit, num_nodes, explored)
         if result is not None:
             return result, num_nodes
@@ -293,7 +290,6 @@ def iterative_deepening_astar(problem):
             return None, num_nodes
         f_limit = min_f + 1
 
-    return None, num_nodes
 # ______________________________________________________________________________
 # Robot Problem
 class RobotNavigation(Problem):
@@ -334,16 +330,40 @@ class RobotNavigation(Problem):
         return (new_col, new_row)  
     
     def manhattan_distance(self, state):
-        """Calculate the minimum Manhattan distance from a state to the nearest goal."""
+        """Calculate the minimum Manhattan distance from a state to the nearest reachable goal."""
         x1, y1 = state
         min_distance = float('inf')
 
         for goal_state in self.goal:
             x2, y2 = goal_state
-            distance = abs(x1 - x2) + abs(y1 - y2)
-            min_distance = min(min_distance, distance)
+            distance = self.shortest_path_distance(state, goal_state)
+            if distance != float('inf'):
+                min_distance = min(min_distance, distance)
 
         return min_distance
+
+    def shortest_path_distance(self, start, goal):
+        """Calculate the Manhattan distance between two states, considering obstacles."""
+        x1, y1 = start
+        x2, y2 = goal
+        distance = 0
+
+        while x1 != x2 or y1 != y2:
+            if x1 < x2:
+                x1 += 1
+            elif x1 > x2:
+                x1 -= 1
+            if y1 < y2:
+                y1 += 1
+            elif y1 > y2:
+                y1 -= 1
+
+            if self.grid[y1][x1] == '#':
+                return float('inf')
+
+            distance += 1
+
+        return distance
 
 
 def run_robot_navigation(filename, method, gui=False):
@@ -498,7 +518,7 @@ def robot_gui(grid, rows, cols, initial, goal, result, path):
     pygame.quit()      
     
 if __name__ == "__main__":
-    if len(sys.argv) == 3: # Run the program normally
+    if len(sys.argv) == 3: # Run the program standard output
         filename = sys.argv[1]
         method = sys.argv[2]
         run_robot_navigation(filename, method)
