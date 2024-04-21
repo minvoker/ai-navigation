@@ -1,19 +1,20 @@
-"""
+'''
 COS30019 Assignment 1 - Robot Navigation Search
 Author: Max Harrison 104586300
 
+Main Program Class
 HOW TO USE CODE INSTRUCTIONS:
 GUI is optional. To run the program in GUI mode, you must have Pygame installed. If you do not have Pygame installed, the program will run in console mode.
 - Methods: BFS, DFS, GBFS, AS, CUS1, CUS2
 - 'python search.py <filename> <method> [GUI]'
-"""
-
+'''
 import sys
 from collections import deque 
 from queue import PriorityQueue
 from utils import *
 
 class Problem:
+    '''Taken from W4 Tutorial'''
     def __init__(self, initial, goal=None):
         """The constructor specifies the initial state, and possibly a goal
         state, if there is a unique goal. Your subclass's constructor can add
@@ -58,6 +59,7 @@ class Problem:
         raise NotImplementedError
 
 class Node:
+    '''Taken from W4 Tutorial'''
     def __init__(self, state, parent=None, action=None, path_cost=0):
         """Create a search tree Node, derived from a parent by an action."""
         self.state = state
@@ -80,7 +82,6 @@ class Node:
                 for action in problem.actions(self.state)]
 
     def child_node(self, problem, action):
-        """[Figure 3.10]"""
         next_state = problem.result(self.state, action)
         next_node = Node(next_state, self, action, problem.path_cost(self.path_cost, self.state, action, next_state))
         return next_node
@@ -162,7 +163,12 @@ def breadth_first_search(problem):
 
 # Iterative Deepening CUS1 --------- WORKING
 def iterative_deepening_bfs(problem):
-    """Iterative Deepening Breadth-First Search"""
+    '''
+    This implementation uses a depth-limited BFS to explore the search space with increasing depth limits. 
+    Starts with depth limit of 0 and iteratively calls depth_limited_bfs and increases the depth limit by 1 each iteration.
+    If goal found returns solution and num_of_nodes.
+    If goal not found after exploring entire search space, returns None and num_of_nodes.
+    '''
     depth = 0
     while True:
         result, num_nodes = depth_limited_bfs(problem, depth)
@@ -171,7 +177,9 @@ def iterative_deepening_bfs(problem):
         depth += 1
 
 def depth_limited_bfs(problem, limit):
-    """Breadth-First Search with Depth Limit"""
+    '''
+    Performs BFS with depth limit using queue as frontier with node and depth.
+    '''
     frontier = deque([(Node(problem.initial), 0)])  # node, depth
     explored = set()
     num_nodes = 0
@@ -228,13 +236,14 @@ def a_star_search(problem):
     '''
     Perform A* search on given problem with an explored set. This implementation uses a PriorityQueue as the frontier, which stores tuples of (f(n), node) where f(n) = g(n) + h(n). g(n) is the path cost and h(n) is the heuristic estimate (Manhattan Distance) of the cost from n to the goal state. At each iteration the node with lowest f(n) is popped from the front for expansion. Explored set is used to avoid revisiting states. Terminates when goal state is found or entire search space has been explored.
     
-    Requires an instance of the problem class as input and returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
+    Returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
     '''
     node = Node(problem.initial)
     num_of_nodes = 1  # Count the initial node
     if problem.goal_test(node.state):
         return node, num_of_nodes
-
+    
+    # Order based on f(n) = g(n) + h(n)
     frontier = PriorityQueue(order='min', f=lambda x: x[0])
     frontier.append((node.path_cost + problem.manhattan_distance(node.state), node))
     explored = set()
@@ -255,9 +264,14 @@ def a_star_search(problem):
 
     return None, num_of_nodes
    
-# CUS2 --------- COMPLETE BUT NOT FINDING OPTIMAL PATHS
+# CUS2 --------- Complete but having issues
 def iterative_deepening_astar(problem):
-    """Iterative Deepening A* (IDA*) with explored set"""
+    '''
+    Iterative Deepening A* (IDA*) with explored set. Combines DFS and Heuristic.
+    Method starts with initial f limit set to manhattan distance of initial state. Calls recursive DFS with the current f limit and updates the f limit to the minimum f value of the child nodes. Continues to call DFS with increasing f limit until a solution is found or entire state space has been explored.
+    
+    Returns a tuple containing the goal node and the number of nodes expanded during the search. Returns None if no goal state is found.
+    '''
     def recursive_dfs(node, problem, g, f_limit, num_of_nodes, explored):
         num_of_nodes += 1
         explored.add(node.state)
@@ -304,6 +318,7 @@ class RobotNavigation(Problem):
                 self.goal.append(initial)
                 '''
     def goal_test(self, state):
+        # Check all goals
         return state in self.goal
         
     def actions(self, state):
@@ -326,16 +341,14 @@ class RobotNavigation(Problem):
         dir_col, dir_row = action  
         new_col, new_row = col + dir_col, row + dir_row 
         #DEBUG
-        #print(f"Applying action {action} to state {state} results in state {(new_col, new_row)}")
+        #print(f"{action}, {state} new state: {(new_col, new_row)}")
         return (new_col, new_row)  
     
     def manhattan_distance(self, state):
         """Calculate the minimum Manhattan distance from a state to the nearest reachable goal."""
-        x1, y1 = state
         min_distance = float('inf')
 
         for goal_state in self.goal:
-            x2, y2 = goal_state
             distance = self.shortest_path_distance(state, goal_state)
             if distance != float('inf'):
                 min_distance = min(min_distance, distance)
@@ -343,11 +356,11 @@ class RobotNavigation(Problem):
         return min_distance
 
     def shortest_path_distance(self, start, goal):
-        """Calculate the Manhattan distance between two states, considering obstacles."""
+        """Calculate the Manhattan distance between two states, including obstacles."""
+        # todo: Check on testx with path blocked, print each step
         x1, y1 = start
         x2, y2 = goal
         distance = 0
-
         while x1 != x2 or y1 != y2:
             if x1 < x2:
                 x1 += 1
@@ -367,10 +380,22 @@ class RobotNavigation(Problem):
 
 
 def run_robot_navigation(filename, method, gui=False):
+    ''' 
+    Runs the robot problem with specified search method and print results, if gui is enabled draw problem in pygame window.
+    Input txt file should be formatted as:
+    - First line: [rows, cols]
+    - Second line: initial state (x, y)
+    - Third line: goal state/s (x, y) | (x, y) | ...
+    - Remaining Lines: Walls (x, y, width, height)
+    
+    If solution found, return goal node reached, number of nodes expanded and path steps.
+    If no solution is found return number of nodes expanded.
+    '''
     with open(filename, 'r') as f:
         data = [line.strip() for line in f.readlines()]
         f.close()
-    
+        
+    # Initialise necessary variables from txt file
     rows, cols = eval(data[0])
     initial = eval(data[1])
     goal_coords = data[2].split('|')
@@ -379,10 +404,10 @@ def run_robot_navigation(filename, method, gui=False):
     else:
         goal = [eval(coord.strip()) for coord in goal_coords]
 
-    # Create an empty grid filled with empty cells '.'
+    # Create an empty grid filled with empty cells
     grid = [['.' for _ in range(cols)] for _ in range(rows)]
     
-    # Add Walls '#'
+    # Add Walls
     for i in data[3:]:
         if i: # Check line is not empty
             x, y, width, height = map(int, i.strip()[1:-1].split(','))
@@ -443,6 +468,10 @@ def run_robot_navigation(filename, method, gui=False):
             
             
 def robot_gui(grid, rows, cols, initial, goal, result, path):
+    '''
+    Displays a graphical representation of the problem using Pygame.
+    grod, rows, cols, intial, goal, result, path must be initialised and passed into method.
+    '''
     # Check for pygame install and import it
     try:
         import pygame
@@ -527,6 +556,7 @@ if __name__ == "__main__":
         filename = sys.argv[1]
         method = sys.argv[2]
         run_robot_navigation(filename, method, gui=True)
+        
     else:
         print("Usage: python program.py <filename> <method> [GUI]")
 
