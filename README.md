@@ -9,7 +9,6 @@
 - [Features/Missing](#featuresmissing)
   - [Features](#features)
   - [Missing Features](#missing-features)
-- [Research](#research)
   - [Graphical User Interface](#graphical-user-interface)
 - [Conclusion](#conclusion)
 - [Acknowledgements/Resources/References](#acknowledgementsresourcesreferences)
